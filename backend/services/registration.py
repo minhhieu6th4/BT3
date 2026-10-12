@@ -4,7 +4,7 @@ from fastapi import HTTPException
 from sqlalchemy import func, insert, select, update
 from sqlalchemy.exc import IntegrityError
 
-from backend.models.tables import audit_logs, competitions, teams, users
+from backend.models.tables import audit_logs, competitions, submissions, teams, users
 
 
 def utc_now():
@@ -39,8 +39,8 @@ def register_team(engine, code, username, password_hash):
             if competition["mode"] != "DEMO":
                 raise HTTPException(409, "Đăng ký tài khoản đội đơn giản hiện chỉ hỗ trợ demo.")
             now = utc_now()
-            if (not competition["registration_open"] or competition["status"] != "REGISTRATION"
-                    or not in_registration_window(competition, now)):
+            from backend.services.windows import is_open
+            if not is_open(competition, "registration", now):
                 raise HTTPException(409, "Đăng ký hiện đang đóng hoặc ngoài thời hạn.")
             if team_count(connection, competition["id"]) >= competition["max_teams"]:
                 raise HTTPException(409, "Đã đủ đội tham gia.")
@@ -65,19 +65,9 @@ def register_team(engine, code, username, password_hash):
 
 
 def control_registration(engine, code, opened, actor_id):
-    with engine.begin() as connection:
-        competition = get_competition(connection, code, lock=True)
-        if competition["status"] not in ("DRAFT", "REGISTRATION") or competition["submission_open"]:
-            raise HTTPException(409, "Không thể thay đổi đăng ký sau khi bước nộp bài đã bắt đầu.")
-        if opened and not in_registration_window(competition, utc_now()):
-            raise HTTPException(409, "Ngoài lịch đăng ký đã cấu hình.")
-        connection.execute(update(competitions).where(competitions.c.id == competition["id"]).values(
-            registration_open=opened, status="REGISTRATION"))
-        connection.execute(insert(audit_logs).values(
-            competition_id=competition["id"], actor_user_id=actor_id,
-            action="REGISTRATION_OPENED" if opened else "REGISTRATION_CLOSED",
-            details={"open": opened}))
-        return {"registration_open": opened, "status": "REGISTRATION"}
+    from backend.services.windows import set_window
+    from backend.schemas.windows import WindowControl
+    return set_window(engine, code, "registration", WindowControl(open=opened), actor_id)
 
 
 def remove_demo_team(engine, code, team_id, actor_id):
@@ -86,13 +76,17 @@ def remove_demo_team(engine, code, team_id, actor_id):
         competition = get_competition(connection, code, lock=True)
         if competition["mode"] != "DEMO":
             raise HTTPException(409, "Chỉ được xóa đội bằng chức năng này trong demo.")
-        if competition["status"] not in ("DRAFT", "REGISTRATION") or competition["submission_open"]:
-            raise HTTPException(409, "Chỉ xóa đội trước khi bắt đầu nộp bài.")
+        if competition["status"] not in ("DRAFT", "REGISTRATION", "CODING"):
+            raise HTTPException(409, "Không xóa đội khi đã bắt đầu xử lý thi đấu.")
         team = connection.execute(select(teams).where(
             teams.c.id == team_id, teams.c.competition_id == competition["id"],
             teams.c.status != "WITHDRAWN").with_for_update()).mappings().first()
         if team is None:
             raise HTTPException(404, "Không tìm thấy đội đang tham gia giải demo này.")
+        has_submissions = connection.scalar(select(func.count()).select_from(submissions).where(
+            submissions.c.team_id == team_id))
+        if has_submissions:
+            raise HTTPException(409, "Đội đã có bài nộp; không xóa để tránh mất lịch sử thi đấu.")
         owner = connection.execute(select(users).where(
             users.c.id == team["owner_user_id"]).with_for_update()).mappings().one()
         other_teams = connection.scalar(select(func.count()).select_from(teams).where(

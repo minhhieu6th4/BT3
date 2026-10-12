@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     jwt_secret: SecretStr
     access_token_minutes: int = Field(default=30, ge=1, le=1440)
     competition_code: str = "demo"
+    submission_dir: Path = ROOT / "storage" / "submissions"
+    max_submission_bytes: int = Field(default=1048576, ge=1, le=10485760)
     cors_origins: list[str] = []
 
     @field_validator("jwt_secret")

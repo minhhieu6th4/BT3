@@ -1,3 +1,18 @@
+# Cập nhật schema 0002
+
+Schema.sql vẫn là baseline 0001. Với database đang dùng: chạy
+migrations/0002_submission_windows.sql bằng tài khoản MySQL quản trị, một lần.
+Với database mới: schema.sql → migration 0002 → seed_demo.sql nếu là demo.
+Không reset dữ liệu hoặc nạp lại seed khi cập nhật.
+
+0002 GIỮ ck_open_phases, thêm registration_mode/submission_mode và
+submissions.source_size_bytes. Backend chỉ cho một cửa mở tại một thời điểm và
+từ chối lịch chồng nhau. Backend tính cửa đang mở từ mode và lịch theo giờ UTC, không dùng
+status giải làm điều kiện khóa hai cửa. Các quy tắc cũ nói phải đóng đăng ký
+trước khi nộp bài/mở lại bị cấm không còn áp dụng ở phiên bản này.
+
+---
+
 # Database BT3
 
 Thiết kế dùng chung MySQL 8.0.16 trở lên (khuyến nghị MySQL 8.4), InnoDB.

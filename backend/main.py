@@ -13,7 +13,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from backend.config import Settings
 from backend.database.connection import create_mysql_engine
 from backend.models.tables import schema_migrations
-from backend.routers import auth, competition, teams
+from backend.routers import auth, competition, teams, submissions
+from backend.upload_limit import UploadLimit
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,7 @@ def create_app(settings=None, engine=None):
     app = FastAPI(title="BT3 Backend", version="0.1.0", lifespan=lifespan)
     app.state.settings = settings
     app.state.engine = engine
+    app.add_middleware(UploadLimit, max_bytes=settings.max_submission_bytes)
     if settings.cors_origins:
         app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins,
                            allow_methods=["GET", "POST", "PUT", "DELETE"],
@@ -48,6 +50,9 @@ def create_app(settings=None, engine=None):
     async def database_error(_request: Request, _exc: SQLAlchemyError):
         # Avoid printing connection credentials or bound data.
         logger.error("Database operation failed (%s)", type(_exc).__name__)
+        if getattr(_exc, "orig", None) and getattr(_exc.orig, "args", [None])[0] == 1054:
+            return JSONResponse(status_code=503, content={"detail":
+                "Database cần cập nhật: chạy migration 0002_submission_windows.sql bằng tài khoản MySQL quản trị."})
         return JSONResponse(status_code=503, content={"detail":
             "Không truy cập được dữ liệu. Kiểm tra kết nối và schema MySQL."})
 
@@ -59,11 +64,18 @@ def create_app(settings=None, engine=None):
                 schema_migrations.c.version == "0001_initial"))
         if baseline is None:
             return JSONResponse(status_code=503, content={"detail": "Thiếu schema 0001_initial."})
-        return {"status": "ok", "database": "connected", "schema": baseline}
+        with engine.connect() as connection:
+            latest = connection.scalar(select(schema_migrations.c.version).where(
+                schema_migrations.c.version == "0002_submission_windows"))
+        if latest is None:
+            return JSONResponse(status_code=503, content={"detail":
+                "Chạy database/migrations/0002_submission_windows.sql trên database đang dùng trước khi tiếp tục."})
+        return {"status": "ok", "database": "connected", "schema": latest}
 
     app.include_router(auth.router)
     app.include_router(teams.router)
     app.include_router(competition.router)
+    app.include_router(submissions.router)
     frontend = Path(__file__).resolve().parents[1] / "frontend"
     app.mount("/assets", StaticFiles(directory=frontend), name="frontend-assets")
 
@@ -75,6 +87,7 @@ def create_app(settings=None, engine=None):
     @app.get("/demo/", include_in_schema=False)
     @app.get("/demo/dang-nhap", include_in_schema=False)
     @app.get("/demo/dang-ky", include_in_schema=False)
+    @app.get("/demo/nop-bai", include_in_schema=False)
     @app.get("/demo/doi", include_in_schema=False)
     @app.get("/demo/quan-tri", include_in_schema=False)
     @app.get("/main", include_in_schema=False)

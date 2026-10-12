@@ -18,7 +18,7 @@ def engine():
         connection.execute("PRAGMA foreign_keys=ON")
     metadata.create_all(engine)
     with engine.begin() as connection:
-        connection.execute(insert(schema_migrations).values(version="0001_initial"))
+        connection.execute(insert(schema_migrations), [{"version": "0001_initial"}, {"version": "0002_submission_windows"}])
         connection.execute(insert(competitions).values(code="demo", name="Demo", mode="DEMO",
             status="DRAFT", max_teams=6, format_config={}))
         connection.execute(insert(users).values(username="admin", password_hash=hash_password("admin-test-password"),
@@ -28,8 +28,8 @@ def engine():
 
 
 @pytest.fixture
-def settings():
-    return Settings(_env_file=None, jwt_secret="test-only-secret-" * 4)
+def settings(tmp_path):
+    return Settings(_env_file=None, jwt_secret="test-only-secret-" * 4, submission_dir=tmp_path / "submissions")
 
 
 @pytest.fixture

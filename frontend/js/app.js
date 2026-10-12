@@ -1,11 +1,12 @@
+import {submissionPage, windowCards} from "/assets/js/submissions.js";
 import {api, session} from "/assets/js/api.js";
 
 const app = document.querySelector("#app");
 const dialog = document.querySelector("#remove-dialog");
-const state = {user: null, competition: null, teams: [], team: null, flash: "", prefill: "", revision: 0, busy: false, remove: null};
+const state = {user: null, competition: null, teams: [], team: null, submissions: [], flash: "", prefill: "", revision: 0, busy: false, remove: null};
 const labels = {DRAFT: "Chuẩn bị", REGISTRATION: "Đăng ký đội", CODING: "Nộp bài", VALIDATING: "Kiểm tra Bot", PLAYING: "Thi đấu", FINISHED: "Hoàn thành"};
 const escape = value => String(value ?? "").replace(/[&<>"']/g, ch => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[ch]));
-const canControl = () => state.competition?.mode === "DEMO" && ["DRAFT", "REGISTRATION"].includes(state.competition.status) && !state.competition.submission_open;
+const canControl = () => state.competition?.mode === "DEMO" && ["DRAFT", "REGISTRATION", "CODING"].includes(state.competition.status);
 const landing = () => state.user?.account_type === "ADMIN" ? "/demo/quan-tri" : "/demo/doi";
 let toastTimer;
 
@@ -83,10 +84,13 @@ async function route() {
       if (state.user.account_type !== "ADMIN") { toast("Bạn không có quyền quản trị.", true); navigate(landing(), true); return; }
       state.teams = await api("/api/teams");
       if (revision === state.revision) renderAdmin();
-    } else if (path === "/demo/doi") {
+    } else if (["/demo/doi", "/demo/nop-bai"].includes(path)) {
       if (state.user.account_type === "ADMIN") { navigate(landing(), true); return; }
       state.team = await api("/api/teams/me", {authenticated: true});
-      if (revision === state.revision) renderTeam();
+      if (path === "/demo/nop-bai") {
+        state.submissions = await api("/api/submissions/me", {authenticated: true});
+        if (revision === state.revision) renderSubmission();
+      } else if (revision === state.revision) renderTeam();
     } else navigate("/demo", true);
   } catch (error) {
     if (revision === state.revision && error.status !== 401) errorScreen(error.message);
@@ -153,7 +157,7 @@ function renderAuth(register) {
 }
 function phases() {
   const c = state.competition;
-  const current = ["DRAFT", "REGISTRATION"].includes(c.status) ? 0 : ["CODING", "VALIDATING"].includes(c.status) ? 1 : 2;
+  const current = location.pathname === "/demo/nop-bai" || c.submission_open ? 1 : ["DRAFT", "REGISTRATION"].includes(c.status) ? 0 : ["CODING", "VALIDATING"].includes(c.status) ? 1 : 2;
   return `<div class="phase-bar" aria-label="Giai đoạn giải">${["Đăng ký đội", "Nộp Bot", "Thi đấu"].map((name, i) => `<div class="phase ${i === current ? "current" : ""}"><b>${String(i + 1).padStart(2, "0")}</b><span>${name}</span></div>`).join("")}</div>`;
 }
 function countCard() {
@@ -163,7 +167,7 @@ function countCard() {
 function renderTeam() {
   document.title = "Đội của tôi · BT3 Demo";
   const t = state.team;
-  setContent(`<section class="dashboard"><div class="page-heading"><div><span class="kicker">Không gian đội thi</span><h1>Sẵn sàng cho thử thách.</h1><p>Thông tin đăng ký của đội trong giải demo.</p></div><span class="meta-label">${escape(state.competition.name)}</span></div>${phases()}<div class="dashboard-grid"><section class="card"><div class="card-head"><h2>Đội của tôi</h2><span class="badge">Đã đăng ký</span></div><div class="team-profile"><div class="avatar">${escape(t.name.slice(0, 2).toUpperCase())}</div><div><h2>${escape(t.name)}</h2><span class="muted">Đội #${t.id}</span></div></div><div class="info-rows"><div class="info-row"><span>Tài khoản đội</span><strong>${escape(state.user.username)}</strong></div><div class="info-row"><span>Trạng thái đội</span><strong>${escape(({REGISTERED: "Đã đăng ký", APPROVED: "Đã duyệt", DISQUALIFIED: "Không đủ điều kiện", WITHDRAWN: "Đã rút"})[t.status] || t.status)}</strong></div><div class="info-row"><span>Giai đoạn giải</span><strong>${escape(labels[state.competition.status] || state.competition.status)}</strong></div></div><div class="upcoming"><strong>Tiếp theo: nộp Bot của đội</strong><p>Chức năng nộp bài sẽ được bổ sung ở bước tiếp theo. Hiện bạn đã có thể kiểm tra đăng ký và đăng nhập.</p></div></section><div class="side-stack">${countCard()}<section class="card"><h2>Trạng thái đăng ký</h2><div id="registration-status">${statusHtml()}</div><p>Ban tổ chức điều khiển việc mở và đóng đăng ký. Suất của bạn đã được ghi nhận.</p><button id="refresh-team" class="button secondary compact">Làm mới thông tin ↻</button></section></div></div></section>`);
+  setContent(`<section class="dashboard"><div class="page-heading"><div><span class="kicker">Không gian đội thi</span><h1>Sẵn sàng cho thử thách.</h1><p>Thông tin đăng ký của đội trong giải demo.</p></div><span class="meta-label">${escape(state.competition.name)}</span></div>${phases()}<div class="dashboard-grid"><section class="card"><div class="card-head"><h2>Đội của tôi</h2><span class="badge">Đã đăng ký</span></div><div class="team-profile"><div class="avatar">${escape(t.name.slice(0, 2).toUpperCase())}</div><div><h2>${escape(t.name)}</h2><span class="muted">Đội #${t.id}</span></div></div><div class="info-rows"><div class="info-row"><span>Tài khoản đội</span><strong>${escape(state.user.username)}</strong></div><div class="info-row"><span>Trạng thái đội</span><strong>${escape(({REGISTERED: "Đã đăng ký", APPROVED: "Đã duyệt", DISQUALIFIED: "Không đủ điều kiện", WITHDRAWN: "Đã rút"})[t.status] || t.status)}</strong></div><div class="info-row"><span>Giai đoạn giải</span><strong>${escape(labels[state.competition.status] || state.competition.status)}</strong></div></div><div class="upcoming"><strong>Nộp Bot của đội</strong><p>${state.competition.submission_open ? "Đang mở nhận bài. Bạn có thể gửi phiên bản mới." : "Bạn có thể xem lịch và lịch sử bài nộp. Ban tổ chức hiện chưa mở nhận bài."}</p><a href="/demo/nop-bai" data-link class="button compact">Đến trang nộp bài →</a></div></section><div class="side-stack">${countCard()}<section class="card"><h2>Trạng thái đăng ký</h2><div id="registration-status">${statusHtml()}</div><p>Ban tổ chức điều khiển việc mở và đóng đăng ký. Suất của bạn đã được ghi nhận.</p><button id="refresh-team" class="button secondary compact">Làm mới thông tin ↻</button></section></div></div></section>`);
   document.querySelector("#refresh-team").addEventListener("click", route);
 }
 function tableHtml() {
@@ -173,10 +177,20 @@ function tableHtml() {
 function renderAdmin() {
   document.title = "Quản trị giải · BT3 Demo";
   const c = state.competition;
-  setContent(`<section class="dashboard"><div class="page-heading"><div><span class="kicker">Ban tổ chức · Giải demo</span><h1>Điều hành giải đấu</h1><p>Quản lý đăng ký và các đội tham gia, tại một nơi.</p></div><button id="refresh-admin" class="button secondary compact">Làm mới ↻</button></div>${phases()}<div class="dashboard-grid"><section class="card"><div class="card-head"><h2>Các đội tham gia</h2><span class="badge">${state.teams.length} đội</span></div>${tableHtml()}<p class="hint">Xóa đội để giải phóng suất và đăng ký lại. Chỉ áp dụng trước khi bắt đầu nộp bài.</p></section><div class="side-stack"><section class="card"><div class="card-head"><h2>Đăng ký đội</h2><span class="badge ${c.registration_open ? "" : "closed"}">${c.registration_open ? "Đang mở" : "Đang đóng"}</span></div><p>Bạn quyết định thời điểm các đội được tạo tài khoản tham gia giải demo.</p><div class="control-buttons"><button id="open-registration" class="button" ${!canControl() || c.registration_open || state.busy ? "disabled" : ""}>Mở đăng ký</button><button id="close-registration" class="button secondary" ${!canControl() || !c.registration_open || state.busy ? "disabled" : ""}>Đóng đăng ký</button></div><p class="hint">${canControl() ? "Đăng nhập vẫn hoạt động khi đăng ký đóng. Giới hạn đội được kiểm tra bởi hệ thống." : "Đăng ký đã khóa theo giai đoạn của giải."}</p></section>${countCard()}<section class="card"><span class="kicker">Bước tiếp theo</span><p>Nộp Bot, chạy giải và công bố kết quả sẽ được bổ sung sau.</p></section></div></div></section>`);
+  setContent(`<section class="dashboard"><div class="page-heading"><div><span class="kicker">Ban tổ chức · Giải demo</span><h1>Điều hành giải đấu</h1><p>Quản lý các đội và lịch đăng ký/nộp bài. Chỉ mở một cửa mỗi thời điểm.</p></div><button id="refresh-admin" class="button secondary compact">Làm mới ↻</button></div>${phases()}<div class="dashboard-grid"><section class="card"><div class="card-head"><h2>Các đội tham gia</h2><span class="badge">${state.teams.length} đội</span></div>${tableHtml()}<p class="hint">Xóa đội để giải phóng suất và đăng ký lại. Chỉ xóa đội chưa có bài nộp và chưa bắt đầu thi đấu.</p></section><div class="side-stack">${windowCards(c, escape)}${countCard()}<section class="card"><span class="kicker">Bước tiếp theo</span><p>Bài nộp đang chờ kiểm tra. Chạy giải và công bố kết quả sẽ được bổ sung sau.</p></section></div></div></section>`);
   document.querySelector("#refresh-admin").addEventListener("click", route);
-  document.querySelector("#open-registration").addEventListener("click", () => control(true));
-  document.querySelector("#close-registration").addEventListener("click", () => control(false));
+  document.querySelectorAll("[data-window]").forEach(button => button.addEventListener("click", () =>
+    manageWindow(button.dataset.window, {mode:"MANUAL", open:button.dataset.open === "true"})));
+  document.querySelectorAll(".window-form").forEach(form => {
+    form.addEventListener("input", () => {form.dataset.dirty = "true";});
+    form.addEventListener("submit", event => {
+      event.preventDefault();
+      const start = form.elements.opens_at.value;
+      const end = form.elements.closes_at.value;
+      if (!start || !end || end <= start) {toast("Thời điểm đóng phải sau thời điểm mở.", true); return;}
+      manageWindow(form.dataset.kind, {mode:"SCHEDULED", opens_at:start+"+07:00", closes_at:end+"+07:00"});
+    });
+  });
   document.querySelectorAll("[data-remove]").forEach(button => button.addEventListener("click", () => {
     state.remove = state.teams.find(t => t.id === Number(button.dataset.remove));
     document.querySelector("#remove-description").textContent = `Bạn đang xóa đội “${state.remove.name}” (#${state.remove.id}) khỏi danh sách tham gia.`;
@@ -189,15 +203,26 @@ async function refreshAdmin() {
   const [competition, teams] = await Promise.all([api("/api/competition"), api("/api/teams")]);
   state.competition = competition; state.teams = teams;
 }
-async function control(open) {
+async function manageWindow(kind, body) {
   if (state.busy) return;
-  state.busy = true; renderAdmin();
+  state.busy = true;
+  const buttons = [...document.querySelectorAll(".window-form button, [data-window]")];
+  const disabled = buttons.map(b => b.disabled);
+  buttons.forEach(b => {b.disabled = true;});
+  let success = false;
   try {
-    await api("/api/admin/registration", {method: "PUT", body: {open}, authenticated: true});
-    await refreshAdmin();
-    toast(open ? "Đã mở đăng ký đội." : "Đã đóng đăng ký đội.");
-  } catch (error) { if (error.status !== 401) toast(error.message, true); }
-  finally { state.busy = false; if (location.pathname === "/demo/quan-tri" && state.user?.account_type === "ADMIN") renderAdmin(); }
+    await api(`/api/admin/${kind}`, {method:"PUT", body, authenticated:true});
+    await refreshAdmin(); success = true;
+    toast(body.mode === "SCHEDULED" ? "Đã lưu lịch tự động." : body.open ? "Đã mở cửa nhận dữ liệu." : "Đã đóng cửa nhận dữ liệu.");
+  } catch (error) {if (error.status !== 401) toast(error.message, true);}
+  finally {
+    state.busy = false;
+    if (success && location.pathname === "/demo/quan-tri" && state.user?.account_type === "ADMIN") renderAdmin();
+    else buttons.forEach((b,i) => {b.disabled=disabled[i];});
+  }
+}
+function renderSubmission() {
+  submissionPage({state, escape, setContent, phases, toast, reload:route});
 }
 document.querySelector("#cancel-remove").addEventListener("click", () => dialog.close());
 dialog.addEventListener("cancel", event => { if (state.busy) event.preventDefault(); });
@@ -237,9 +262,27 @@ setInterval(async () => {
     if (competition.mode !== "DEMO") { errorScreen("Backend không còn chọn giải demo."); return; }
     if (location.pathname === "/demo/quan-tri") {
       state.teams = await api("/api/teams");
-      if (revision === state.revision) renderAdmin();
+      if (revision === state.revision && !document.querySelector('.schedule-details[open]') && !document.querySelector('.window-form[data-dirty="true"]')) renderAdmin();
+      else if (revision === state.revision) {
+        for (const kind of ["registration", "submission"]) {
+          const w = competition[`${kind}_window`];
+          const badge = document.querySelector(`[data-window-status="${kind}"]`);
+          if (badge) {badge.textContent=w.open ? "Đang mở" : "Đang đóng"; badge.classList.toggle("closed",!w.open);}
+          document.querySelectorAll(`[data-window="${kind}"]`).forEach(button => {
+            button.disabled=w.mode === "MANUAL" && (button.dataset.open === "true") === w.open;
+          });
+        }
+      }
     } else if (location.pathname === "/demo/doi") {
       renderTeam();
+    } else if (location.pathname === "/demo/nop-bai") {
+      // Preserve file selection; update permission only. Explicit refresh reloads history.
+      const button = document.querySelector("#submit-bot");
+      const file = document.querySelector("#bot-file");
+      if (button) button.disabled = !competition.submission_open;
+      if (file) file.disabled = !competition.submission_open;
+      const gate = document.querySelector("#submission-gate-state");
+      if (gate) {gate.textContent=competition.submission_open ? "Đang mở nộp bài" : "Nộp bài đang đóng"; gate.classList.toggle("closed", !competition.submission_open);}
     } else {
       const strip = document.querySelector("#registration-status");
       if (strip) strip.innerHTML = statusHtml();

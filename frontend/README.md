@@ -1,3 +1,20 @@
+# Trang nộp Bot và lịch tự động
+
+Sau khi nâng database lên 0002 theo backend/README.md và chạy backend:
+
+- Đội đăng nhập → Đến trang nộp bài → chọn student_bot.py → Nộp bài.
+- /demo/nop-bai hiển thị lịch, quyền nộp và lịch sử phiên bản.
+- Admin có hai thẻ Đăng ký đội/Nộp Bot riêng. Mở ngay/Đóng ngay là thủ công.
+- Hẹn giờ tự động: nhập hai mốc theo giờ Việt Nam, Lưu lịch. Chỉ một cửa mở tại một thời điểm; lịch không được chồng nhau.
+- Chọn thời điểm đóng sau mở. Mở/đóng ngay thay lịch cũ, cho phép mở lại.
+- PENDING là đã nhận file, chưa được xác nhận hợp lệ; không có kết quả giả từ Judge.
+- Giao diện tự cập nhật trạng thái; không xóa file đang chọn hay form lịch đang nhập.
+
+Các mô tả cũ bên dưới nói nộp Bot chưa có hoặc hai cửa phụ thuộc đã được thay bằng
+phần cập nhật này. Không chạy lại schema.sql; chỉ dùng migration 0002 cho DB cũ.
+
+---
+
 # Giao diện demo BT3
 
 HTML/CSS/JavaScript thuần, không cần npm/build hoặc máy chủ frontend riêng.

@@ -1,5 +1,5 @@
 def test_frontend_routes_assets_and_api_remain_available(client):
-    for path in ["/demo", "/demo/", "/demo/dang-nhap", "/demo/dang-ky", "/demo/doi", "/demo/quan-tri", "/main"]:
+    for path in ["/demo", "/demo/", "/demo/dang-nhap", "/demo/dang-ky", "/demo/doi", "/demo/nop-bai", "/demo/quan-tri", "/main"]:
         response = client.get(path)
         assert response.status_code == 200
         assert 'lang="vi"' in response.text

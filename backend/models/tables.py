@@ -4,7 +4,7 @@ Only columns needed by this milestone are mapped; database/schema.sql remains
 canonical. Test-only create_all creates isolated SQLite tables, not MySQL schema.
 """
 from sqlalchemy import (MetaData, Table, Column, Integer, String, Boolean,
-                        DateTime, ForeignKey, JSON, UniqueConstraint)
+                        DateTime, ForeignKey, JSON, Text, UniqueConstraint, CheckConstraint)
 
 metadata = MetaData()
 users = Table("users", metadata,
@@ -23,11 +23,14 @@ competitions = Table("competitions", metadata,
     Column("max_teams", Integer, nullable=False),
     Column("registration_open", Boolean, nullable=False, default=False),
     Column("submission_open", Boolean, nullable=False, default=False),
+    Column("registration_mode", String(16), nullable=False, default="MANUAL"),
+    Column("submission_mode", String(16), nullable=False, default="MANUAL"),
     Column("registration_opens_at", DateTime),
     Column("registration_closes_at", DateTime),
     Column("submission_opens_at", DateTime),
     Column("submission_closes_at", DateTime),
     Column("format_config", JSON, nullable=False),
+    CheckConstraint("NOT (registration_open AND submission_open)", name="ck_open_phases"),
 )
 teams = Table("teams", metadata,
     Column("id", Integer, primary_key=True),
@@ -47,4 +50,19 @@ audit_logs = Table("audit_logs", metadata,
 )
 schema_migrations = Table("schema_migrations", metadata,
     Column("version", String(64), primary_key=True),
+)
+
+submissions = Table("submissions", metadata,
+    Column("id", Integer, primary_key=True),
+    Column("team_id", Integer, ForeignKey("teams.id"), nullable=False),
+    Column("submitted_by", Integer, ForeignKey("users.id"), nullable=False),
+    Column("version", Integer, nullable=False),
+    Column("source_file_path", String(500), nullable=False),
+    Column("source_sha256", String(64), nullable=False),
+    Column("source_size_bytes", Integer),
+    Column("received_at", DateTime, nullable=False),
+    Column("validation_status", String(32), nullable=False, default="PENDING"),
+    Column("validation_message", Text),
+    Column("validated_at", DateTime),
+    UniqueConstraint("team_id", "version"),
 )

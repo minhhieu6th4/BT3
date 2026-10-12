@@ -1,3 +1,59 @@
+# Cập nhật nộp Bot và hẹn giờ
+
+Backend hiện yêu cầu schema `0002_submission_windows`. Database đã tạo trước đó:
+trong DBeaver, dùng kết nối root/quản trị, chọn BT3_Schema1 rồi chạy một lần
+`database/migrations/0002_submission_windows.sql`. Không chạy lại schema/seed.
+Tài khoản ứng dụng hiện có không cần quyền ALTER; quyền này chỉ dùng khi nâng schema.
+Nếu chạy migration lỗi, dừng và kiểm tra, không chạy lại toàn bộ vì DDL tự commit.
+
+Cài `python -m pip install -r requirements.txt` trong .venv, khởi động lại backend.
+/api/health trả schema 0002_submission_windows khi sẵn sàng. Thiếu migration sẽ
+báo lỗi cập nhật dữ liệu; backend không tự sửa database khi khởi động.
+
+## API mới
+
+- POST /api/submissions: multipart/form-data, đúng một trường file với tên file
+  student_bot.py; chỉ TEAM là chủ đội REGISTERED/APPROVED trong giải được chọn.
+- GET /api/submissions/me: lịch sử riêng của đội theo phiên bản mới nhất trước.
+- PUT /api/admin/submission: điều khiển cửa nộp Bot.
+- PUT /api/admin/registration: vẫn giữ đường dẫn, dùng cùng định dạng điều khiển.
+
+Thủ công: `{"mode":"MANUAL","open":true}` hoặc false (mode có thể bỏ qua).
+Hẹn giờ: `{"mode":"SCHEDULED","opens_at":"2026-10-12T09:00:00+07:00",
+"closes_at":"2026-10-12T14:00:00+07:00"}`. Đây là ví dụ, cần chọn lịch thực tế.
+Mốc thời gian API bắt buộc có múi giờ. Chỉ một cửa được mở tại một thời điểm.
+Admin có thể mở lại khi cửa kia đóng. Hai lịch không được chồng nhau; lịch nối
+liền (đóng đăng ký đúng lúc mở nộp bài) được phép. Thao tác thủ công xóa lịch của
+đúng cửa đó. Giữ nguyên ck_open_phases trong MySQL. Cửa mở thủ công được coi là
+chưa có thời điểm đóng, nên phải đóng hoặc hẹn giờ đóng trước khi đặt lịch cửa kia.
+
+Lịch lưu MySQL, trạng thái hiệu lực được tính bằng đồng hồ UTC máy chủ ở mỗi
+request: opens_at <= now < closes_at. Không cần cron hoặc browser luôn mở.
+Hai cột *_open lưu lựa chọn thủ công, không tự thay đổi theo giờ ở chế độ SCHEDULED;
+đọc API để biết trạng thái hiệu lực thay vì chỉ đọc hai cột đó trong DBeaver.
+UI cập nhật khoảng 15 giây; backend kiểm tra hạn ở lúc nhận đủ file và có khóa
+transaction, nên UI chưa kịp cập nhật cũng không thể nộp quá hạn.
+
+Mặc định file tối đa 1 MiB, đúng tên student_bot.py, văn bản UTF-8 không rỗng và
+không chứa NUL. Chưa kiểm tra cú pháp/API Bot/import ở đây; bài luôn PENDING và
+chưa chọn phiên bản thi đấu. Không import/exec hoặc chạy file đã nộp trên host.
+
+File lưu dưới storage/submissions với tên UUID .py, SHA-256 và dung lượng ghi vào
+MySQL. source_file_path là tên tương đối so với SUBMISSION_DIR. Thư mục riêng,
+không phục vụ qua /assets; API không trả đường dẫn hoặc mã nguồn đội khác.
+MAX_SUBMISSION_BYTES và SUBMISSION_DIR có thể đặt trong .env nếu cần thay mặc định.
+Storage cần giữ cùng bản sao database; các file này được Git bỏ qua.
+
+Nếu nhận file thất bại thì không ghi phiên bản; nếu SQL thất bại thì rollback và
+xóa file vừa tạo. Xử lý sự cố đột ngột giữa filesystem/DB vẫn cần kiểm tra file mồ
+côi khi vận hành; filesystem không có transaction chung với MySQL.
+
+Admin chỉ xóa đội demo chưa có bài nộp và chưa thi đấu, giữ lịch sử đã nộp.
+Các mô tả bên dưới về khóa đăng ký theo giai đoạn/lịch cũ được thay bằng quy tắc
+chỉ mở một cửa ở phần cập nhật này. Chưa triển khai Judge/chọn Bot cuối/Tournament.
+
+---
+
 # Backend BT3 giai đoạn 1
 
 Đã thực hiện hai bước đầu: FastAPI kết nối MySQL; đăng nhập/phân quyền và đăng ký

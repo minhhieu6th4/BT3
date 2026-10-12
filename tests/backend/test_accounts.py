@@ -15,7 +15,7 @@ def credentials(name="team01"):
 
 
 def test_health_and_default_closed(client):
-    assert client.get("/api/health").json()["schema"] == "0001_initial"
+    assert client.get("/api/health").json()["schema"] == "0002_submission_windows"
     state = client.get("/api/competition").json()
     assert state["team_count"] == 0 and not state["registration_available"]
     assert client.post("/api/teams", json=credentials()).status_code == 409
@@ -41,7 +41,7 @@ def test_open_register_login_close(client, engine, admin_headers):
     assert client.post("/api/teams", json=credentials("team02")).status_code == 409
     with engine.connect() as connection:
         actions = connection.scalars(select(audit_logs.c.action)).all()
-        assert actions == ["REGISTRATION_OPENED", "TEAM_REGISTERED", "REGISTRATION_CLOSED"]
+        assert actions == ["REGISTRATION_CONTROL_CHANGED", "TEAM_REGISTERED", "REGISTRATION_CONTROL_CHANGED"]
 
 
 def test_duplicate_registration_rolls_back(client, engine, opened):
@@ -89,12 +89,12 @@ def test_expired_token(client, settings):
 
 def test_registration_dates_and_later_phases(client, engine, admin_headers, opened):
     with engine.begin() as connection:
-        connection.execute(update(competitions).values(registration_closes_at=datetime(2000, 1, 1)))
+        connection.execute(update(competitions).values(registration_mode="SCHEDULED", registration_opens_at=datetime(1999, 1, 1), registration_closes_at=datetime(2000, 1, 1)))
     assert client.post("/api/teams", json=credentials()).status_code == 409
     assert not client.get("/api/competition").json()["registration_available"]
     with engine.begin() as connection:
         connection.execute(update(competitions).values(status="CODING", registration_open=False))
-    assert client.put("/api/admin/registration", json={"open": True}, headers=admin_headers).status_code == 409
+    assert client.put("/api/admin/registration", json={"open": True}, headers=admin_headers).status_code == 200
 
 
 def test_validation_cannot_assign_admin_or_echo_password(client, opened):
@@ -164,6 +164,6 @@ def test_remove_blocks_main_late_phase_and_unknown_team(client, engine, admin_he
         connection.execute(update(competitions).values(mode="MAIN"))
     assert client.delete(f"/api/admin/teams/{team_id}", headers=admin_headers).status_code == 409
     with engine.begin() as connection:
-        connection.execute(update(competitions).values(mode="DEMO", status="CODING"))
+        connection.execute(update(competitions).values(mode="DEMO", status="PLAYING"))
     assert client.delete(f"/api/admin/teams/{team_id}", headers=admin_headers).status_code == 409
     assert len(client.get("/api/teams").json()) == 1

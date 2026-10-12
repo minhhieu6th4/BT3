@@ -18,3 +18,8 @@ BT3_TEST_MYSQL_DATABASE, BT3_TEST_MYSQL_USER, BT3_TEST_MYSQL_PASSWORD;
 BT3_TEST_MYSQL_HOST mặc định localhost; BT3_TEST_MYSQL_PORT mặc định 3306.
 Không tự đọc .env chứa kết nối app để tránh vô tình kiểm thử vào BT3_Schema1.
 Nếu chưa cấu hình, hai test này báo skipped. Backend thực tế luôn dùng MySQL.
+
+Nộp bài: kiểm tra quyền/riêng tư, phiên bản, file UTF-8/rỗng/tên sai, cap upload
+kể cả không Content-Length, rollback file khi SQL lỗi, không thực thi code đã nộp.
+Lịch: chỉ một cửa mở, chặn lịch chồng nhau, cho lịch nối tiếp, lịch đã hết không chặn cửa mới, override thủ công, UTC và biên mở-inclusive/đóng-exclusive.
+Test MySQL tùy chọn cần chạy migration 0002 ở database thử trước.

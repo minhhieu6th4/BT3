@@ -11,13 +11,14 @@ export class ApiError extends Error {
 
 export async function api(path, {method = "GET", body, authenticated = false} = {}) {
   const headers = {Accept: "application/json"};
-  if (body !== undefined) headers["Content-Type"] = "application/json";
+  const multipart = body instanceof FormData;
+  if (body !== undefined && !multipart) headers["Content-Type"] = "application/json";
   if (authenticated && session.token) headers.Authorization = `Bearer ${session.token}`;
   let response;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 12000);
   try {
-    response = await fetch(path, {method, headers, body: body === undefined ? undefined : JSON.stringify(body), cache: "no-store", signal: controller.signal});
+    response = await fetch(path, {method, headers, body: body === undefined ? undefined : (multipart ? body : JSON.stringify(body)), cache: "no-store", signal: controller.signal});
   } catch { throw new ApiError("Không kết nối được máy chủ hoặc yêu cầu quá lâu. Hãy thử lại.", 0); }
   finally { clearTimeout(timeout); }
   const data = await response.json().catch(() => ({}));
