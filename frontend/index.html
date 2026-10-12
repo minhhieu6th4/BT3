@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#123d32">
+  <title>BT3 · Algorithm Battle</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <script type="module" src="/assets/js/app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Đến nội dung chính</a>
+  <header class="site-header">
+    <a class="brand" href="/demo" data-link aria-label="BT3 Demo, trang đầu">
+      <span class="brand-symbol" aria-hidden="true">B<span>3</span></span>
+      <span><strong>BT3</strong><small>ALGORITHM BATTLE</small></span>
+    </a>
+    <nav class="header-nav" aria-label="Điều hướng">
+      <span class="env-label"><i></i>Giải demo</span>
+      <a href="/main" data-link id="main-link">Giải chính <span aria-hidden="true">↗</span></a>
+      <div id="account-nav"></div>
+    </nav>
+  </header>
+  <main id="main" tabindex="-1"><div id="app" aria-busy="true"><div class="loading-screen"><span class="spinner"></span><p>Đang kết nối với giải…</p></div></div></main>
+  <footer class="site-footer"><span>UET Algorithm Battle</span><span>BT3 · Không gian thi đấu thuật toán</span></footer>
+  <div id="notice" class="toast" role="status" aria-live="polite" hidden></div>
+  <dialog id="remove-dialog" aria-labelledby="remove-title">
+    <div class="dialog-icon" aria-hidden="true">!</div>
+    <h2 id="remove-title">Xóa đội khỏi demo?</h2>
+    <p id="remove-description"></p>
+    <p class="muted">Tài khoản đội cũ sẽ bị vô hiệu hóa. Suất và tên được giải phóng để đăng ký lại.</p>
+    <p id="remove-error" class="error-message" role="alert" hidden></p>
+    <div class="dialog-actions"><button id="cancel-remove" class="button secondary">Giữ lại đội</button><button id="confirm-remove" class="button danger">Xóa đội</button></div>
+  </dialog>
+</body>
+</html>

@@ -1,0 +1,8 @@
+# Versions verified for backend milestone 1.
+fastapi==0.143.0
+uvicorn==0.54.0
+SQLAlchemy==2.0.54
+PyMySQL[rsa]==1.2.3
+pydantic-settings==2.15.0
+argon2-cffi==25.1.0
+PyJWT==2.15.1

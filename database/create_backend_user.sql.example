@@ -1,0 +1,6 @@
+-- TEMPLATE ONLY. Run in DBeaver as a MySQL administrator after replacing
+-- the password. Do not commit a copy containing your real password.
+-- This does not create a website account or modify existing application data.
+CREATE USER 'bt3_app'@'localhost' IDENTIFIED BY 'REPLACE_WITH_A_PRIVATE_PASSWORD';
+GRANT SELECT, INSERT, UPDATE ON `BT3_Schema1`.* TO 'bt3_app'@'localhost';
+-- Do not grant CREATE, DROP, ALTER or administrative privileges to the backend.
